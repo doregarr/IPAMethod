@@ -1,45 +1,14 @@
+
+<!DOCTYPE html>
+<html lang="en">
 <?php
 session_start();
 if (empty($_SESSION['user']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit;
 }
-$foto = isset($_SESSION['foto']) ? $_SESSION['foto'] : 'default-profile.png'; // Use default if no photo
-$fotoUrl = 'foto/' . $foto; // Path to the folder where photos are stored
-// Include database connection
-include("koneksi.php");
-
-// Initialize variables
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$limit = 25;
-$page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-$offset = ($page - 1) * $limit;
-
-// Query to get the total number of records
-$total_query = "SELECT COUNT(*) AS total FROM login WHERE (nama LIKE ? OR nip LIKE ?)";
-$params = ["%$search%", "%$search%"];
-$stmt_total = $koneksi->prepare($total_query);
-$stmt_total->bind_param(str_repeat('s', count($params)), ...$params);
-$stmt_total->execute();
-$total_result = $stmt_total->get_result()->fetch_assoc();
-$total_rows = $total_result['total'];
-$total_pages = ceil($total_rows / $limit);
-
-// Query to get the data with pagination
-$query = "SELECT nip, nama, pangkat, jabatan, foto, role FROM login WHERE (nama LIKE ? OR nip LIKE ?)";
-$params = ["%$search%", "%$search%"];
-$query .= " ORDER BY nip ASC LIMIT ? OFFSET ?";
-$params[] = $limit;
-$params[] = $offset;
-
-$stmt = $koneksi->prepare($query);
-$stmt->bind_param(str_repeat('s', count($params) - 2) . 'ii', ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
+include 'koneksi.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
@@ -81,6 +50,50 @@ $result = $stmt->get_result();
         }
     </style>
 </head>
+<?php
+session_start();
+if (empty($_SESSION['user']) || $_SESSION['role'] !== 'admin') {
+    header("Location: login.php");
+    exit;
+}
+include 'koneksi.php';
+
+// Pencarian berdasarkan nama dan kategori
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$kategoriFilter = isset($_GET['kategori']) ? $_GET['kategori'] : '';
+
+// Pagination
+$limit = 25;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? $_GET['page'] : 1;
+$offset = ($page - 1) * $limit;
+
+// Membuat klausa WHERE sesuai dengan filter pencarian
+$whereClause = "WHERE 1=1";
+if (!empty($search)) {
+    $whereClause .= " AND j.nama LIKE '%$search%'";
+}
+if (!empty($kategoriFilter) && in_array($kategoriFilter, ['Performance', 'Importance'])) {
+    $whereClause .= " AND j.kategori = '$kategoriFilter'";
+}
+
+// Query untuk mendapatkan total data
+$totalQuery = "SELECT COUNT(*) AS total FROM tbl_jawaban j 
+               JOIN tbl_pertanyaan p ON j.id_pertanyaan = p.id_pertanyaan 
+               $whereClause";
+$totalResult = mysqli_query($koneksi, $totalQuery);
+$totalRow = mysqli_fetch_assoc($totalResult);
+$totalData = $totalRow['total'];
+$totalPages = ceil($totalData / $limit);
+
+// Query untuk mendapatkan data sesuai halaman
+$query = "SELECT j.id_jawaban, j.nama, j.email, p.pertanyaan, j.kategori, j.jawaban, j.created_at 
+          FROM tbl_jawaban j 
+          JOIN tbl_pertanyaan p ON j.id_pertanyaan = p.id_pertanyaan
+          $whereClause
+          ORDER BY j.id_jawaban DESC 
+          LIMIT $limit OFFSET $offset";
+$result = mysqli_query($koneksi, $query);
+?>
 
 <body>
 <header id="header" class="header fixed-top d-flex align-items-center">
@@ -138,12 +151,12 @@ $result = $stmt->get_result();
     <ul class="sidebar-nav" id="sidebar-nav">
         <li class="nav-item">
             <a class="nav-link collapsed" data-bs-target="#forms-nav" data-bs-toggle="collapse" href="#">
-                <i class="bi bi-journal-text"></i><span>Riwayat Cuti</span><i class="bi bi-chevron-down ms-auto"></i>
+                <i class="bi bi-journal-text"></i><span>Kuesioner</span><i class="bi bi-chevron-down ms-auto"></i>
             </a>
             <ul id="forms-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
                 <li>
                     <a href="riwayatpengajuanAdminPage.php">
-                        <i class="bi bi-circle"></i><span>Riwayat Pengajuan Cuti</span>
+                        <i class="bi bi-circle"></i><span>Tambah Pertanyaan</span>
                     </a>
                 </li>
             </ul>
@@ -155,12 +168,17 @@ $result = $stmt->get_result();
             <ul id="tables-nav" class="nav-content collapse" data-bs-parent="#sidebar-nav">
                 <li>
                     <a href="tabeldata.php">
-                        <i class="bi bi-circle"></i><span>Tabel Data Pegawai</span>
+                        <i class="bi bi-circle"></i><span>Tabel Data Jawaban</span>
                     </a>
                 </li>
                 <li>
-                    <a href="tambahdata.php">
-                        <i class="bi bi-circle"></i><span>Tambah Data Pegawai</span>
+                    <a href="performancedata.php">
+                        <i class="bi bi-circle"></i><span>Tabel Data Performance</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="importancedata.php">
+                        <i class="bi bi-circle"></i><span>Tabel Data Importance</span>
                     </a>
                 </li>
             </ul>
@@ -170,174 +188,179 @@ $result = $stmt->get_result();
 
 <!-- ======= Main ======= -->
 <main id="main" class="main">
-    <!-- Search and Filter Form -->
     <section class="section">
         <div class="row">
             <div class="col-lg-12">
                 <div class="card">
                     <div class="card-body">
+                        <h5 class="card-title">Data Jawaban</h5>
+
+                        <!-- Form Pencarian -->
                         <form method="GET" action="">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="search" class="form-label">Cari berdasarkan Nama atau NIP</label>
-                                        <input type="text" class="form-control" id="search" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Nama atau NIP">
-                                    </div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <input type="text" name="search" id="searchInput" class="form-control" 
+                                           placeholder="Cari berdasarkan nama..." value="<?php echo htmlspecialchars($search); ?>">
                                 </div>
-                                <div class="col-md-1">
-                                    <div class="mb-1">
-                                        <label class="form-label">&nbsp;</label>
-                                        <button type="submit" class="btn btn-primary w-100" style="margin-top: 0; padding-top: 8px; padding-bottom: 8px;"><i class="bi bi-search"></i></button>
-                                    </div>
+                                <div class="col-md-3">
+                                    <select name="kategori" class="form-select">
+                                        <option value="">Semua Kategori</option>
+                                        <option value="Performance" <?php echo ($kategoriFilter == 'Performance') ? 'selected' : ''; ?>>Performance</option>
+                                        <option value="Importance" <?php echo ($kategoriFilter == 'Importance') ? 'selected' : ''; ?>>Importance</option>
+                                    </select>
                                 </div>
+                                
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-primary">Cari</button>
+                                   
+                                </div>
+                                <div class="col-md-6">
+   
+ <!-- Tombol untuk membuka modal -->
+<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#uploadModal">
+    Impor Performance
+</button>
+
+<button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#uploadModal1">
+    Impor Importance
+</button>
+
                             </div>
+                            
                         </form>
+
+                        <!-- Tabel Data -->
+                        <table class="table table-striped table-bordered mt-3">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nama</th>
+                                    <th>Email</th>
+                                    <th>Pertanyaan</th>
+                                    <th>Kategori</th>
+                                    <th>Jawaban</th>
+                                    <th>Dijawab Pada</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                if (mysqli_num_rows($result) > 0) {
+                                    $i = $offset + 1;
+                                    while ($row = mysqli_fetch_assoc($result)) {
+                                        echo "<tr>";
+                                        echo "<td>{$i}</td>";
+                                        echo "<td>" . htmlspecialchars($row['nama']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['email']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['pertanyaan']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['kategori']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['jawaban']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['created_at']) . "</td>";
+                                        echo "</tr>";
+                                        $i++;
+                                    }
+                                } else {
+                                    echo "<tr><td colspan='7' class='text-center'>Belum ada jawaban</td></tr>";
+                                }
+                                ?>
+                            </tbody>
+                        </table>
+
+                        <!-- Pagination -->
+                        <nav>
+    <ul class="pagination">
+        <?php if ($page > 1): ?>
+            <li class="page-item">
+                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $page - 1; ?>">Sebelumnya</a>
+            </li>
+        <?php endif; ?>
+
+        <!-- Halaman pertama -->
+        <li class="page-item <?php echo ($page == 1) ? 'active' : ''; ?>">
+            <a class="page-link" href="?search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=1">1</a>
+        </li>
+
+        <?php if ($page > 3): ?>
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+        <?php endif; ?>
+
+        <!-- Menampilkan 2 halaman sebelum dan sesudah halaman aktif -->
+        <?php for ($i = max(2, $page - 2); $i <= min($totalPages - 1, $page + 2); $i++): ?>
+            <li class="page-item <?php echo ($i == $page) ? 'active' : ''; ?>">
+                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
+            </li>
+        <?php endfor; ?>
+
+        <?php if ($page < $totalPages - 2): ?>
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+        <?php endif; ?>
+
+        <!-- Halaman terakhir -->
+        <?php if ($totalPages > 1): ?>
+            <li class="page-item <?php echo ($page == $totalPages) ? 'active' : ''; ?>">
+                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $totalPages; ?>"><?php echo $totalPages; ?></a>
+            </li>
+        <?php endif; ?>
+
+        <?php if ($page < $totalPages): ?>
+            <li class="page-item">
+                <a class="page-link" href="?search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $page + 1; ?>">Selanjutnya</a>
+            </li>
+        <?php endif; ?>
+    </ul>
+</nav>
+
+
                     </div>
                 </div>
             </div>
         </div>
     </section>
-
-   <!-- Tabel Data Pengguna -->
-<section class="section">
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Tabel Data Pengguna</h5>
-
-                    <!-- Table -->
-                    <table class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th scope="col">#</th>
-                                <th scope="col">NIP</th>
-                                <th scope="col">Nama</th>
-                                <th scope="col">Pangkat</th>
-                                <th scope="col">Jabatan</th>
-                                <th scope="col">Foto</th>
-                                <th scope="col">Role</th>
-                                <th scope="col">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-<?php
-if ($result->num_rows > 0) {
-    $i = $offset + 1;
-    while ($row = $result->fetch_assoc()) {
-        $fotoUrl = 'foto/' . htmlspecialchars($row['foto']); // Path to the folder where photos are stored
-        echo "<tr>";
-        echo "<th scope='row'>" . $i++ . "</th>";
-        echo "<td>" . htmlspecialchars($row['nip']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['nama']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['pangkat']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['jabatan']) . "</td>";
-        echo "<td><img src='$fotoUrl' class='profile-img' alt='Foto'></td>";
-        echo "<td>" . htmlspecialchars($row['role']) . "</td>";
-        echo "<td>
-            <button class='btn btn-warning btn-edit' data-bs-toggle='modal' data-bs-target='#editModal' data-nip='" . htmlspecialchars($row['nip']) . "' data-nama='" . htmlspecialchars($row['nama']) . "' data-pangkat='" . htmlspecialchars($row['pangkat']) . "' data-jabatan='" . htmlspecialchars($row['jabatan']) . "' data-role='" . htmlspecialchars($row['role']) . "' data-foto='" . htmlspecialchars($row['foto']) . "'>Edit</button>
-            <button class='btn btn-danger' onclick='confirmDelete(\"" . htmlspecialchars($row['nip']) . "\")'>Hapus</button>
-        </td>";
-        echo "</tr>";
-    }
-} else {
-    echo "<tr><td colspan='8' class='text-center'>Tidak ada data</td></tr>";
-}
-?>
-</tbody>
-                    </table>
-
-                    <!-- Showing info -->
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <span>Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $result->num_rows, $total_rows); ?> of <?php echo $total_rows; ?> entries</span>
-
-                        <!-- Pagination -->
-                        <nav aria-label="Page navigation">
-                            <ul class="pagination justify-content-center">
-                                <?php if ($page > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo htmlspecialchars($search); ?>" aria-label="Previous">
-                                            <span aria-hidden="true">&laquo;</span>
-                                        </a>
-                                    </li>
-                                <?php endif; ?>
-                                <?php for ($p = 1; $p <= $total_pages; $p++): ?>
-                                    <li class="page-item <?php echo $p == $page ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $p; ?>&search=<?php echo htmlspecialchars($search); ?>"><?php echo $p; ?></a>
-                                    </li>
-                                <?php endfor; ?>
-                                <?php if ($page < $total_pages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo htmlspecialchars($search); ?>" aria-label="Next">
-                                            <span aria-hidden="true">&raquo;</span>
-                                        </a>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-</main><!-- End Main -->
-
-<!-- Edit Modal -->
-<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+</main>
+<!-- Modal 1-->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="editModalLabel">Edit Data Pengguna</h5>
+                <h5 class="modal-title" id="uploadModalLabel">Impor Data Performance</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="editForm" method="POST" action="update_user.php" enctype="multipart/form-data">
-                    <input type="hidden" name="nip" id="editNip">
-                    
+                <form id="uploadForm" action="import_performance.php" method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="editNama" class="form-label">Nama</label>
-                        <input type="text" class="form-control" id="editNama" name="nama" required>
+                        <label for="file_excel" class="form-label">Pilih file Excel:</label>
+                        <input type="file" name="file_excel" id="file_excel" class="form-control" required>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="editPangkat" class="form-label">Pangkat</label>
-                        <input type="text" class="form-control" id="editPangkat" name="pangkat" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="editJabatan" class="form-label">Jabatan</label>
-                        <input type="text" class="form-control" id="editJabatan" name="jabatan" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="editPassword" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="editPassword" name="password">
-                        <small class="form-text text-muted">Kosongkan jika tidak ingin mengubah password.</small>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="editRole" class="form-label">Role</label>
-                        <select id="editRole" name="role" class="form-select" required>
-                            <option value="admin">Admin</option>
-                            <option value="member">User</option>
-                            <!-- Tambahkan opsi lain sesuai kebutuhan -->
-                        </select>
-                    </div>
-                    
-                    <!-- <div class="mb-3">
-                        <label for="editFoto" class="form-label">Foto</label>
-                        <input type="file" class="form-control" id="editFoto" name="foto">
-                        <img id="editFotoPreview" src="" alt="Preview" class="profile-img mt-2" style="display: none;">
-                    </div> -->
-                    
-                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                    <button type="submit" name="upload" class="btn btn-primary">Upload</button>
                 </form>
             </div>
         </div>
     </div>
-</div><!-- End Edit Modal -->
+</div>
+<!-- Modal 2-->
+<div class="modal fade" id="uploadModal1" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalLabel">Impor Data Importance</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm" action="import_importance.php" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file_excel" class="form-label">Pilih file Excel:</label>
+                        <input type="file" name="file_excel" id="file_excel" class="form-control" required>
+                    </div>
+                    <button type="submit" name="upload1" class="btn btn-primary">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Bootstrap & jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+</script>
 
 <!-- Vendor JS Files -->
 <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -353,83 +376,7 @@ if ($result->num_rows > 0) {
 
 <!-- Your existing code... -->
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Handle Edit Button Click
-    document.querySelectorAll('.btn-edit').forEach(button => {
-        button.addEventListener('click', function () {
-            const nip = this.getAttribute('data-nip');
-            const nama = this.getAttribute('data-nama');
-            const pangkat = this.getAttribute('data-pangkat');
-            const jabatan = this.getAttribute('data-jabatan');
-            const role = this.getAttribute('data-role');
-            const foto = this.getAttribute('data-foto');
 
-            // Set values in the form
-            document.getElementById('editNip').value = nip;
-            document.getElementById('editNama').value = nama;
-            document.getElementById('editPangkat').value = pangkat;
-            document.getElementById('editJabatan').value = jabatan;
-
-            // Set role in select box
-            const roleSelect = document.getElementById('editRole');
-            roleSelect.value = role;
-
-            // Show current photo in the modal
-            const editFotoPreview = document.getElementById('editFotoPreview');
-            if (foto) {
-                editFotoPreview.src = 'foto/' + foto;
-                editFotoPreview.style.display = 'block';
-            } else {
-                editFotoPreview.style.display = 'none';
-            }
-
-            // Show the modal
-            const editModal = new bootstrap.Modal(document.getElementById('editModal'));
-            editModal.show();
-        });
-    });
-
-    // Handle Foto Preview
-    document.getElementById('editFoto').addEventListener('change', function () {
-        const file = this.files[0];
-        const preview = document.getElementById('editFotoPreview');
-
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                preview.src = e.target.result;
-                preview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
-        } else {
-            preview.style.display = 'none';
-        }
-    });
-
-    // Handle Delete Button Click
-
-});
-</script>
-<script>
-    function confirmDelete(nip) {
-        Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: "Data ini akan dihapus secara permanen!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Ya, hapus!',
-            cancelButtonText: 'Batal'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Redirect to the delete script with the selected nip
-                window.location.href = 'delete_user.php?nip=' + encodeURIComponent(nip);
-            }
-        });
-    }
-    </script>
 
 </body>
 </html>

@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-  <title>Pengajuan Cuti</title>
+  <title>Kuesioner</title>
   <meta content="" name="description">
   <meta content="" name="keywords">
 
@@ -43,15 +43,6 @@
 </head>
 
 <body>
-<?php
-session_start();
-if (empty($_SESSION['user']) || $_SESSION['role'] !== 'member') {
-    header("Location: login.php");
-    exit;
-}
-$foto = isset($_SESSION['foto']) ? $_SESSION['foto'] : 'default-profile.png'; // Gunakan default jika tidak ada foto
-$fotoUrl = 'foto/' . $foto; // Path ke folder tempat foto disimpan
-?>
 
   <!-- Header -->
   <header id="header" class="header fixed-top d-flex align-items-center">
@@ -59,7 +50,7 @@ $fotoUrl = 'foto/' . $foto; // Path ke folder tempat foto disimpan
     <div class="d-flex align-items-center justify-content-between">
       <a href="userPage.php" class="logo d-flex align-items-center">
         <img src="assets/img/logodilmil.png" alt="">
-        <span class="d-none d-lg-block">Pengajuan Cuti</span>
+        <span class="d-none d-lg-block">Kuesioner</span>
       </a>
       <i class="bi bi-list toggle-sidebar-btn"></i>
     </div>
@@ -69,15 +60,12 @@ $fotoUrl = 'foto/' . $foto; // Path ke folder tempat foto disimpan
 
         <li class="nav-item dropdown pe-3">
           <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
-            <img src="<?php echo htmlspecialchars($fotoUrl); ?>" alt="Profile" class="profile-img">
-            <span class="d-none d-md-block dropdown-toggle ps-2"><?php echo htmlspecialchars($_SESSION['nama']); ?></span>
+          
           </a>
 
           <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
             <li class="dropdown-header">
-              <h6><?php echo htmlspecialchars($_SESSION['nama']); ?></h6>
-              <span><?php echo htmlspecialchars($_SESSION['pangkat']); ?></span><br>
-              <span><?php echo htmlspecialchars($_SESSION['jabatan']); ?></span>
+      
             </li>
             <li><hr class="dropdown-divider"></li>
             <li>
@@ -107,17 +95,17 @@ $fotoUrl = 'foto/' . $foto; // Path ke folder tempat foto disimpan
     <ul class="sidebar-nav" id="sidebar-nav">
       <li class="nav-item">
         <a class="nav-link collapsed" data-bs-target="#forms-nav" data-bs-toggle="collapse" href="#">
-          <i class="bi bi-journal-text"></i><span>Pengajuan</span><i class="bi bi-chevron-down ms-auto"></i>
+          <i class="bi bi-journal-text"></i><span>Daftar Kuesioner</span><i class="bi bi-chevron-down ms-auto"></i>
         </a>
         <ul id="forms-nav" class="nav-content collapse " data-bs-parent="#sidebar-nav">
           <li>
-            <a href="formdata.php">
-              <i class="bi bi-circle"></i><span>Form Pengajuan</span>
+            <a href="kuesionerimportance.php">
+              <i class="bi bi-circle"></i><span>Kuesioner Importance</span>
             </a>
           </li>
           <li>
-            <a href="riwayatpengajuan.php">
-              <i class="bi bi-circle"></i><span>Riwayat Pengajuan</span>
+            <a href="kuesionerperformance.php">
+              <i class="bi bi-circle"></i><span>Kuesioner Performance</span>
             </a>
           </li>
         </ul>

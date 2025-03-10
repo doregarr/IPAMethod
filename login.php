@@ -44,7 +44,7 @@
                 <div class="card-body">
                   <div class="pt-4 pb-2">
                     <h5 class="card-title text-center pb-0 fs-4">Login</h5>
-                    <p class="text-center small">Masukkan NIP dan Password</p>
+                    <p class="text-center small">Masukkan Usernamee dan Password</p>
                   </div>
 
                   <!-- Form login -->
@@ -52,9 +52,9 @@
                     <div class="col-12">
                       <label for="yourUsername" class="form-label">NIP</label>
                       <div class="input-group has-validation">
-                        <input type="text" name="nip" class="form-control" id="yourUsername" required>
+                        <input type="text" name="username" class="form-control" id="yourUsername" required>
                         <div class="invalid-feedback">
-                          Please enter your NIP.
+                          Please enter your Username.
                         </div>
                       </div>
                     </div>
@@ -72,6 +72,13 @@
                     <div class="col-12">
                       <button class="btn btn-primary w-100" type="submit">Login</button>
                     </div>
+                   
+                    <div class="col-12 text-center">
+                      <p class="small mb-0">Isi Kuesioner? <a href="kuesionerimportance.php">Klik disini</a></p>
+                    </div>
+                    <!-- <div class="col-12">
+                      <a href="kuesionerimportance.php">Isi Kuesioner</a>
+                    </div> -->
                   </form>
                   <!-- End of Form -->
                 </div>

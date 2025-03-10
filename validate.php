@@ -2,11 +2,11 @@
 include("koneksi.php");
 
 // Ambil data dari form
-$user = $_POST['nip'];
+$user = $_POST['username'];
 $password = $_POST['password'];
 
 // Query untuk mengambil data pengguna
-$sql = "SELECT * FROM login WHERE nip = ?";
+$sql = "SELECT * FROM login WHERE username = ?";
 $stmt = $koneksi->prepare($sql);
 $stmt->bind_param("s", $user);
 $stmt->execute();
@@ -15,13 +15,14 @@ $data = $result->fetch_assoc();
 
 if ($data && password_verify($password, $data['passs'])) {
     session_start();
-    $_SESSION['user'] = $data['nip'];
+    $_SESSION['user'] = $data['username'];
     $_SESSION['nama'] = $data['nama']; // Tambahkan session untuk nama
     $_SESSION['role'] = $data['role'];
     $_SESSION['foto'] = $data['foto']; // Tambahkan session untuk foto
     $_SESSION['jabatan'] = $data['jabatan']; // Tambahkan session untuk foto
-    $_SESSION['pangkat'] = $data['pangkat']; // Tambahkan session untuk foto
+    $_SESSION['email'] = $data['email']; // Tambahkan session untuk foto
 
+    
     // Redirect berdasarkan role pengguna
     if ($data['role'] == 'admin') {
         header("Location: adminPage.php");
