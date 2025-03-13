@@ -37,75 +37,55 @@
   * License: https://bootstrapmade.com/license/
   ======================================================== -->
 </head>
-
-<body>
-<script>
-    // Check for URL parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const status = urlParams.get('status');
-    
-    if (status === 'success') {
-      Swal.fire({
-        title: 'Berhasil!',
-        text: 'Pengajuan berhasil diajukan!',
-        icon: 'success',
-        confirmButtonText: 'OK'
-      }).then(() => {
-        // Set timeout for 1.5 seconds (1500 milliseconds)
-        setTimeout(() => {
-          window.location.href = 'formdata.php'; // Redirect after 1.5 seconds
-        }, 1500); // 1500 milliseconds = 1.5 seconds
-      });
-    } else if (status === 'error') {
-      Swal.fire({
-        title: 'Gagal!',
-        text: 'Pengajuan gagal diajukan!',
-        icon: 'error',
-        confirmButtonText: 'OK'
-      });
-    } else if (status === 'kuota_habis') {
-      Swal.fire({
-        title: 'Kuota Cuti Habis!',
-        text: 'Kuota cuti Anda telah habis. Tidak dapat mengajukan cuti lagi.',
-        icon: 'warning',
-        confirmButtonText: 'OK'
-      });
-    }
-</script>
 <?php
+include 'koneksi.php'; // Pastikan ada file koneksi database
+
+// Ambil pertanyaan dari database
+$query = "SELECT * FROM tbl_pertanyaan";
+$result = mysqli_query($koneksi, $query);
+?><?php
 session_start();
 if (empty($_SESSION['user']) || $_SESSION['role'] !== 'member') {
     header("Location: login.php");
     exit;
 }
-$foto = isset($_SESSION['foto']) ? $_SESSION['foto'] : 'default-profile.png'; // Gunakan default jika tidak ada foto
-$fotoUrl = 'foto/' . $foto; // Path ke folder tempat foto disimpan
-$nama = isset($_SESSION['nama']) ? $_SESSION['nama'] : ''; // Ambil nama dari session
-$nip = isset($_SESSION['user']) ? $_SESSION['nip'] : ''; // Ambil NIP dari session
-
-
-// Koneksi ke database
-include("koneksi.php");
-
-// Query untuk mengambil data pengajuan
-$query = "SELECT * FROM tbl_pengajuan WHERE nip = ?";
-$stmt = $koneksi->prepare($query);
-$stmt->bind_param("s", $_SESSION['user']); // Menggunakan NIP dari session
-$stmt->execute();
-$result = $stmt->get_result();
-
-// Query untuk menghitung total cuti disetujui
-$jumlah_query = "SELECT SUM(totaldiajukan) AS total_cuti_disetujui FROM tbl_pengajuan WHERE nip = ? AND status_pengajuan = 'Disetujui'";
-$jumlah_stmt = $koneksi->prepare($jumlah_query);
-$jumlah_stmt->bind_param("s", $_SESSION['user']);
-$jumlah_stmt->execute();
-$jumlah_result = $jumlah_stmt->get_result();
-$jumlah_row = $jumlah_result->fetch_assoc();
-$total_cuti_disetujui = $jumlah_row['total_cuti_disetujui'] ? $jumlah_row['total_cuti_disetujui'] : 0;
-$kuota_habis = $total_cuti_disetujui >= 12;
 ?>
+<body>
 
-  <!-- ======= Header ======= -->
+<?php
+include 'koneksi.php';
+session_start();
+
+// Pastikan user sudah login
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
+    exit();
+}
+
+$username = $_SESSION['user']; // Ambil username dari sesi login
+$nama = $_SESSION['nama'];
+$email = $_SESSION['email'];
+
+// Ambil semua pertanyaan dari database
+$queryPertanyaan = "SELECT * FROM tbl_pertanyaan";
+$resultPertanyaan = mysqli_query($koneksi, $queryPertanyaan);
+
+// Ambil jawaban user berdasarkan username
+$queryJawaban = "SELECT id_pertanyaan, jawaban FROM tbl_jawaban WHERE username = ?";
+$stmt = mysqli_prepare($koneksi, $queryJawaban);
+mysqli_stmt_bind_param($stmt, "s", $username);
+mysqli_stmt_execute($stmt);
+$resultJawaban = mysqli_stmt_get_result($stmt);
+
+// Simpan jawaban user dalam array untuk memudahkan pengecekan
+$jawabanUser = [];
+while ($row = mysqli_fetch_assoc($resultJawaban)) {
+    $jawabanUser[$row['id_pertanyaan']] = $row['jawaban'];
+}
+
+mysqli_stmt_close($stmt);
+?>
+  <!-- Header -->
   <header id="header" class="header fixed-top d-flex align-items-center">
 
     <div class="d-flex align-items-center justify-content-between">
@@ -114,58 +94,43 @@ $kuota_habis = $total_cuti_disetujui >= 12;
         <span class="d-none d-lg-block">Pengajuan Cuti</span>
       </a>
       <i class="bi bi-list toggle-sidebar-btn"></i>
-    </div><!-- End Logo -->
-
-    <!-- End Search Bar -->
+    </div>
 
     <nav class="header-nav ms-auto">
       <ul class="d-flex align-items-center">
-
-        <li class="nav-item d-block d-lg-none">
-          <a class="nav-link nav-icon search-bar-toggle " href="#">
-            <i class="bi bi-search"></i>
-          </a>
-        </li><!-- End Search Icon-->
 
         <li class="nav-item dropdown pe-3">
           <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
             <img src="<?php echo htmlspecialchars($fotoUrl); ?>" alt="Profile" class="profile-img">
             <span class="d-none d-md-block dropdown-toggle ps-2"><?php echo htmlspecialchars($_SESSION['nama']); ?></span>
-          </a><!-- End Profile Image Icon -->
+          </a>
 
           <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
             <li class="dropdown-header">
-              <h6><?php echo htmlspecialchars($_SESSION['nama']); ?></h6>
-              <span><?php echo htmlspecialchars($_SESSION['role']); ?></span>
+      
             </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
+            <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item d-flex align-items-center" href="user.php">
                 <i class="bi bi-person"></i>
                 <span>My Profile</span>
               </a>
             </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
+            <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item d-flex align-items-center" href="logout.php">
                 <i class="bi bi-box-arrow-right"></i>
                 <span>Sign Out</span>
               </a>
             </li>
-
-          </ul><!-- End Profile Dropdown Items -->
-        </li><!-- End Profile Nav -->
+          </ul>
+        </li>
 
       </ul>
-    </nav><!-- End Icons Navigation -->
+    </nav>
 
-  </header><!-- End Header -->
+  </header>
+
 
   <!-- ======= Sidebar ======= -->
   <aside id="sidebar" class="sidebar">
@@ -211,92 +176,93 @@ $kuota_habis = $total_cuti_disetujui >= 12;
   
   <main id="main" class="main">
     <div class="pagetitle">
-      <h1>Formulir Pengajuan Cuti</h1>
+        <h1>Kuesioner</h1>
     </div>
 
     <section class="section">
-      <div class="row">
-        <div class="col-lg-8">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">Silahkan isi data berikut :</h5>
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Silahkan isi data berikut :</h5>
 
-              <!-- General Form Elements -->
-              <form action="simpan.php" method="POST" <?php echo $kuota_habis ? 'disabled' : ''; ?>>
-                <div class="row mb-3">
-                  <label for="inputText" class="col-sm-2 col-form-label">Nama</label>
-                  <div class="col-sm-6">
-                    <input type="text" class="form-control" name="nama" value="<?php echo htmlspecialchars($nama); ?>" required disabled>
-                  </div>
-                </div>
-                <div class="row mb-3">
-                  <label for="text" class="col-sm-2 col-form-label">NIP</label>
-                  <div class="col-sm-6">
-                    <input type="text" class="form-control" name="nip" value="<?php echo htmlspecialchars($nip); ?>" required>
-                  </div>
-                </div>
-                <div class="row mb-3">
-                  <label for="inputNumber" class="col-sm-2 col-form-label">No HP</label>
-                  <div class="col-sm-6">
-                    <input type="number" class="form-control" name="nohp" required>
-                  </div>
-                </div>
-                
-                <div class="row mb-3">
-                  <label for="inputDate" class="col-sm-2 col-form-label">Tanggal Mulai Cuti</label>
-                  <div class="col-sm-6">
-                    <input type="date" class="form-control" name="tglmulai" required>
-                  </div>  
-                </div>
-                
-                <div class="row mb-3">
-                  <label for="inputDate" class="col-sm-2 col-form-label">Tanggal Berhenti Cuti</label>
-                  <div class="col-sm-6">
-                    <input type="date" class="form-control" name="tglberhenti" required>
-                  </div>  
-                </div>
+                        <form action="tambahjawaban.php" method="POST">
+                            <div class="row mb-3">
+                                <label class="col-sm-2 col-form-label">Nama</label>
+                                <div class="col-sm-6">
+                                    <input type="text" class="form-control" name="nama" value="<?= htmlspecialchars($nama); ?>" readonly>
+                                </div>
+                            </div>
 
-                <div class="row mb-3">
-                  <label class="col-sm-2 col-form-label">Jenis Cuti</label>
-                  <div class="col-sm-6">
-                    <select class="form-select" aria-label="Default select example" name="jeniscuti" required>
-                      <option value="" disabled selected>Pilih</option>
-                      <option value="Cuti Tahunan">Cuti Tahunan</option>
-                      <option value="Cuti Besar">Cuti Besar</option>
-                      <option value="Cuti Melahirkan">Cuti Melahirkan</option>
-                    </select>
-                  </div>
+                            <div class="row mb-3">
+                                <label class="col-sm-2 col-form-label">Email</label>
+                                <div class="col-sm-6">
+                                    <input type="text" class="form-control" name="email" value="<?= htmlspecialchars($email); ?>" readonly>
+                                </div>
+                            </div>
+
+                            <!-- Menampilkan pertanyaan dari database berdasarkan jenis_pertanyaan -->
+                            <?php
+                            $sudahMenjawabSemua = true; // Flag untuk cek apakah semua pertanyaan sudah dijawab
+                            $jenis_sebelumnya = "";
+
+                            // Query untuk mengambil pertanyaan dari database
+                            $query = "SELECT id_pertanyaan, pertanyaan, jenis_pertanyaan FROM tbl_pertanyaan ORDER BY jenis_pertanyaan";
+                            $resultPertanyaan = mysqli_query($koneksi, $query);
+
+                            while ($row = mysqli_fetch_assoc($resultPertanyaan)) :
+                                $id_pertanyaan = $row['id_pertanyaan'];
+                                $pertanyaan = $row['pertanyaan'];
+                                $jenis_pertanyaan = $row['jenis_pertanyaan']; // Menggunakan jenis_pertanyaan dari database
+                                $jawaban = isset($jawabanUser[$id_pertanyaan]) ? $jawabanUser[$id_pertanyaan] : null;
+
+                                if ($jawaban === null) {
+                                    $sudahMenjawabSemua = false; // Set false jika ada pertanyaan yang belum dijawab
+                                }
+
+                                // Tampilkan jenis pertanyaan jika berubah
+                                if ($jenis_pertanyaan !== $jenis_sebelumnya) {
+                                    echo "<h5 class='mt-4'><strong>" . htmlspecialchars($jenis_pertanyaan) . "</strong></h5>";
+                                    $jenis_sebelumnya = $jenis_pertanyaan;
+                                }
+                            ?>
+                                <div class="row mb-3">
+                                    <label class="col-sm-12 col-form-label"><?= htmlspecialchars($pertanyaan) ?></label>
+                                    <div class="col-sm-12">
+                                        <?php for ($i = 1; $i <= 5; $i++) : ?>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" 
+                                                    name="jawaban_<?= $id_pertanyaan ?>" 
+                                                    value="<?= $i ?>" 
+                                                    <?= ($jawaban == $i) ? "checked" : "" ?> 
+                                                    <?= ($jawaban !== null) ? "disabled" : "" ?> 
+                                                    required>
+                                                <label class="form-check-label"><?= $i ?></label>
+                                            </div>
+                                        <?php endfor; ?>
+                                    </div>
+                                </div>
+                            <?php endwhile; ?>
+
+                            <?php if (!$sudahMenjawabSemua) : ?>
+                                <div class="row mb-3">
+                                    <label class="col-sm-2 col-form-label"></label>
+                                    <div class="col-sm-10">
+                                        <button type="submit" class="btn btn-primary">Ajukan</button>
+                                    </div>
+                                </div>
+                            <?php else : ?>
+                                <div class="alert alert-success">Anda sudah menjawab semua pertanyaan. Tidak dapat mengubah jawaban.</div>
+                            <?php endif; ?>
+                        </form>
+
+                    </div>
                 </div>
-
-                <div class="row mb-3">
-                  <label for="inputNumber" class="col-sm-2 col-form-label">Keterangan</label>
-                  <div class="col-sm-6">
-                    <textarea class="form-control" name="keterangan" rows="4" placeholder="Masukkan keterangan" required></textarea>
-                  </div>
-                </div>
-
-                <div class="row mb-3">
-                  <label class="col-sm-2 col-form-label"></label>
-                  <div class="col-sm-10">
-                    <button type="submit" class="btn btn-primary" <?php echo $kuota_habis ? 'disabled' : ''; ?>>Ajukan</button>
-                  </div>
-                </div>
-
-              </form>
-
-              <?php if ($kuota_habis): ?>
-                <div class="alert alert-warning mt-3" role="alert">
-                  Kuota Cuti Anda telah habis. Tidak dapat mengajukan cuti lagi.
-                </div>
-              <?php endif; ?>
-
             </div>
-          </div>
-
         </div>
-      </div>
     </section>
-  </main><!-- End #main -->
+</main>
+
 
   <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
 
